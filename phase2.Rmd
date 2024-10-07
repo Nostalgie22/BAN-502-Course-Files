@@ -1,0 +1,116 @@
+---
+title: "phase222"
+output: word_document
+date: "2024-10-02"
+---
+
+```{r}
+# Load necessary libraries
+library(dplyr)
+library(caret)
+
+# Check for missing values
+sum(is.na(train))
+
+# Impute missing values (e.g., with median for numeric columns)
+train <- train %>%
+  mutate(across(where(is.numeric), ~ifelse(is.na(.), median(., na.rm = TRUE), .)))
+
+# Convert categorical variables (if any) to factors
+train$failure <- as.factor(train$failure)
+
+# Split the data into training and validation sets (80/20 split)
+set.seed(123)
+trainIndex <- createDataPartition(train$failure, p = 0.8, list = FALSE)
+train_set <- train[trainIndex, ]
+validation_set <- train[-trainIndex, ]
+
+# Check the structure of the processed dataset
+str(train_set)
+
+```
+```{r}
+# Load randomForest library
+library(randomForest)
+
+# Train the Random Forest model
+set.seed(123)
+rf_model <- randomForest(failure ~ ., data = train_set, ntree = 100, mtry = 2, importance = TRUE)
+
+# View the model summary
+print(rf_model)
+
+```
+```{r}
+# Make predictions on the validation set
+validation_preds <- predict(rf_model, newdata = validation_set)
+
+# Evaluate performance using a confusion matrix
+confusionMatrix(validation_preds, validation_set$failure)
+
+```
+```{r}
+# Calculate the proportion of the majority class in the train dataset
+majority_class <- names(which.max(table(train$failure)))
+
+# Calculate naive accuracy
+naive_accuracy <- sum(train$failure == majority_class) / nrow(train)
+
+# Print naive accuracy
+print(paste("Naive Accuracy:", naive_accuracy))
+
+
+```
+```{r}
+# Load necessary libraries
+library(randomForest)
+
+# Train the Random Forest model using the training set
+set.seed(123)
+rf_model <- randomForest(failure ~ ., data = train_set, ntree = 100, mtry = 2, importance = TRUE)
+
+# View model summary
+print(rf_model)
+
+```
+```{r}
+# Make predictions on the validation set
+validation_preds <- predict(rf_model, newdata = validation_set)
+
+# Evaluate model performance using a confusion matrix
+library(caret)
+conf_matrix <- confusionMatrix(validation_preds, validation_set$failure)
+
+# Print the model accuracy
+model_accuracy <- conf_matrix$overall['Accuracy']
+print(paste("Random Forest Accuracy:", model_accuracy))
+
+```
+```{r}
+# Compare model accuracy with naive accuracy
+if(model_accuracy > naive_accuracy) {
+  print("The Random Forest model's accuracy is better than the naive accuracy.")
+} else {
+  print("The Random Forest model's accuracy is not better than the naive accuracy.")
+}
+
+```
+```{r}
+# Predict on the validation set (since we don't use a test set here)
+validation_preds <- predict(rf_model, newdata = validation_set)
+
+# Assuming your validation_set has an 'Id' column for submission
+# Create the submission dataframe
+submission <- data.frame(id = validation_set$id, failure = validation_preds)
+
+# Check the first few rows to verify the format
+head(submission)
+
+# Save the submission to a CSV file for Kaggle or project submission
+write.csv(submission, file = "submission.csv", row.names = FALSE)
+
+# Confirm the file has been saved
+print("Submission file created and saved as 'submission.csv'")
+
+```
+
