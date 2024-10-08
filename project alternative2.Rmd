@@ -1,0 +1,187 @@
+---
+title: "alternative"
+output: word_document
+date: "2024-10-08"
+---
+
+```{r}
+
+# Load necessary libraries
+library(tidyverse)
+library(tidymodels)
+
+# Load the dataset
+head(ames_student_1) 
+
+```
+```{r}
+missing_values <- colSums(is.na(ames_student_1))
+print(missing_values)
+
+```
+```{r}
+ames_student_1 <- ames_student_1 %>%
+  mutate(
+    MS_SubClass = as.factor(MS_SubClass),
+    MS_Zoning = as.factor(MS_Zoning),
+    Street = as.factor(Street),
+    Lot_Shape = as.factor(Lot_Shape),
+    Land_Contour = as.factor(Land_Contour),
+    Neighborhood = as.factor(Neighborhood),
+    Condition_1 = as.factor(Condition_1),
+    Condition_2 = as.factor(Condition_2),
+    Bldg_Type = as.factor(Bldg_Type),
+    House_Style = as.factor(House_Style),
+    Roof_Style = as.factor(Roof_Style),
+    Foundation = as.factor(Foundation),
+    Heating = as.factor(Heating),
+    Central_Air = as.factor(Central_Air),
+    Electrical = as.factor(Electrical),
+    Functional = as.factor(Functional),
+    Garage_Type = as.factor(Garage_Type),
+    Sale_Type = as.factor(Sale_Type),
+    Sale_Condition = as.factor(Sale_Condition)
+  )
+
+```
+```{r}
+library(tidymodels)
+
+recipe <- recipe(Above_Median ~ ., data = ames_student_1) %>%
+  step_other(Neighborhood, threshold = 0.05) %>%
+  step_dummy(all_nominal_predictors())
+
+```
+```{r}
+ames_student_1 <- ames_student_1 %>%
+  select(-Longitude, -Latitude)
+
+```
+```{r}
+missing_values <- colSums(is.na(ames_student_1))
+print(missing_values)
+
+```
+```{r}
+ames_student_1$Above_Median <- ifelse(ames_student_1$Above_Median == "Yes", 1, 0)
+
+```
+```{r}
+set.seed(123)
+training_rows <- sample(1:nrow(ames_student_1), 0.8 * nrow(ames_student_1))
+train_data <- ames_student_1[training_rows, ]
+test_data <- ames_student_1[-training_rows, ]
+
+# Check that Above_Median is binary now
+table(train_data$Above_Median)
+
+```
+```{r}
+logistic_model <- glm(Above_Median ~ ., data = train_data, family = binomial)
+summary(logistic_model)
+
+```
+```{r}
+
+library(tidymodels)
+
+# Define the recipe with step_other to group rare factor levels
+ames_recipe <- recipe(Above_Median ~ ., data = train_data) %>%
+  step_other(Condition_2, threshold = 0.05) %>%
+  step_dummy(all_nominal_predictors())
+
+# Preprocess the training data
+prepped_data <- prep(ames_recipe, training = train_data)
+
+# Apply the recipe to the training and test data
+train_prepped <- bake(prepped_data, new_data = train_data)
+test_prepped <- bake(prepped_data, new_data = test_data)
+
+```
+```{r}
+
+# Train logistic regression model
+logistic_model <- glm(Above_Median ~ ., data = train_prepped, family = binomial)
+
+# Make predictions on the test set
+predicted_probs <- predict(logistic_model, test_prepped, type = "response")
+predicted_class <- ifelse(predicted_probs > 0.5, 1, 0)
+
+# Convert predicted_class to a factor with levels 0 and 1
+predicted_class <- factor(predicted_class, levels = c(0, 1))
+
+# Ensure test_prepped$Above_Median is a factor with levels 0 and 1
+test_prepped$Above_Median <- factor(test_prepped$Above_Median, levels = c(0, 1))
+
+```
+```{r}
+library(caret)
+confusionMatrix(predicted_class, test_prepped$Above_Median)
+
+```
+```{r}
+library(rpart)
+library(rpart.plot)
+
+# Train the classification tree model
+tree_model <- rpart(Above_Median ~ ., data = train_prepped, method = "class")
+
+# Visualize the tree
+rpart.plot(tree_model)
+
+```
+```{r}
+# Predict on the test data
+tree_predictions <- predict(tree_model, test_prepped, type = "class")
+```
+```{r}
+# Load the caret library
+library(caret)
+```
+```{r}
+# Evaluate the classification tree model
+confusionMatrix(tree_predictions, test_prepped$Above_Median)
+
+```
+```{r}
+# load the randomForest
+library(randomForest)
+
+# Train the random forest model
+set.seed(123)  # For reproducibility
+rf_model <- randomForest(Above_Median ~ ., data = train_prepped, ntree = 500, mtry = 3, importance = TRUE)
+
+# View the random forest model summary
+print(rf_model)
+
+```
+```{r}
+train_prepped$Above_Median <- factor(train_prepped$Above_Median, levels = c(0, 1))
+test_prepped$Above_Median <- factor(test_prepped$Above_Median, levels = c(0, 1))
+
+```
+```{r}
+table(train_prepped$Above_Median)
+table(test_prepped$Above_Median)
+
+```
+```{r}
+rf_model <- randomForest(Above_Median ~ ., data = train_prepped, ntree = 500, mtry = 3, importance = TRUE, type = "classification")
+
+```
+```{r}
+rf_predictions <- predict(rf_model, newdata = test_prepped)
+confusionMatrix(rf_predictions, test_prepped$Above_Median)
+
+```
+```{r}
+results <- data.frame(
+  Model = c("Logistic Regression", "Classification Tree", "Random Forest"),
+  Accuracy_Test = c(85.82, 89.05, 91.44),
+  Sensitivity = c(83.25, 86.29, 93.91),
+  Specificity = c(88.21, 91.59, 89.15)
+)
+print(results)
+
+```
+
